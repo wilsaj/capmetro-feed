@@ -1,0 +1,59 @@
+---
+- hosts: all
+  sudo: yes
+  vars:
+    aws_bucket: "capmetro-feed"
+    today: "`date +\\%Y-\\%m-\\%d`"
+    yesterday: "`date --date yesterday +\\%Y-\\%m-\\%d`"
+    alerts_dir: "/data/alerts/"
+    alerts_yesterday: "{{alerts_dir}}{{yesterday}}"
+    alerts_path: "{{alerts_dir}}{{today}}/capmetro-alerts-`date +\\%Y-\\%m-\\%d-\\%H:\\%M:\\%S`.pbf"
+    gtfs_dir: "/data/gtfs-info/"
+    gtfs_path: "{{gtfs_dir}}`date +\\%Y-\\%m-\\%d`.zip"
+    locations_dir: "/data/locations/"
+    locations_yesterday: "{{locations_dir}}{{yesterday}}"
+    locations_path: "{{locations_dir}}{{today}}/capmetro-realtime-`date +\\%Y-\\%m-\\%d-\\%H:\\%M:\\%S`.pbf"
+
+  tasks:
+  - name: Set timezone to CDT
+    copy: content='America/Chicago'
+          dest=/etc/timezone
+          owner=root
+          group=root
+          mode=0644
+          backup=yes
+    notify:
+      - update timezone
+
+  - name: install aws cli
+    apt: name=awscli state=present
+
+  - name: add cronjob for downloading vehicle locations
+    cron: name="download vehicle locations"
+          day="*" hour="*" minute="*"
+          job="mkdir -p {{locations_dir}}{{today}}; curl -L 'https://data.texas.gov/download/i5qp-g5fd/application/octet-stream' > {{locations_path}}"
+
+  - name: add cronjob for sending yesterday's locations to s3
+    cron: name="tar and upload yesterday's locations"
+          day="*" hour="0" minute="3"
+          job="tar -czvf {{locations_yesterday}}.tgz {{locations_yesterday}} && rm -rf {{locations_yesterday}} && aws s3 cp {{locations_yesterday}}.tgz s3://{{aws_bucket}}{{locations_yesterday}}.tgz"
+
+  - name: add cronjob for downloading alerts
+    cron: name="download alerts locations"
+          day="*" hour="*" minute="0,15,30,45"
+          job="mkdir -p {{alerts_dir}}{{today}}; curl -L 'https://data.texas.gov/download/nusn-7fcn/application/octet-stream' > {{alerts_path}}"
+
+  - name: add cronjob for sending yesterday's alerts to s3
+    cron: name="tar and upload yesterday's alerts"
+          day="*" hour="0" minute="3"
+          job="tar -czvf {{alerts_yesterday}}.tgz {{alerts_yesterday}} && rm -rf {{alerts_yesterday}} && aws s3 cp {{alerts_yesterday}}.tgz s3://{{aws_bucket}}{{alerts_yesterday}}.tgz"
+
+  - name: add cronjob for uploading general gtfs data to s3
+    cron: name="upload misc gtfs data to s3"
+          day="1,15" hour="0" minute="5"
+          job="mkdir -p {{gtfs_dir}}; curl -L 'https://data.texas.gov/download/r4v4-vz24/application/zip' > {{gtfs_path}}; aws s3 cp {{gtfs_path}} s3://{{aws_bucket}}{{gtfs_path}}"
+
+  handlers:
+    - name: update timezone
+      command: dpkg-reconfigure --frontend noninteractive tzdata
+
