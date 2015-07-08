@@ -1,23 +1,38 @@
-.PHONY: data
+LOCATION_TGZS_REMOTE:=$(shell aws s3 ls --recursive s3://capmetro-feed/data/locations | awk '{print $$4}')
+LOCATION_TGZS:=$(patsubst data/%,tgz/%,$(LOCATION_TGZS_REMOTE))
+LOCATION_PBFS:=$(patsubst tgz/%.tgz,pbf/%,$(LOCATION_TGZS))
+
+.PHONY: clean data pbf tgz load-%
+
 
 all: data
 
 clean:
-	rm -rf data/*
+	rm -rf pbf/*
+	rm -rf tgz/*
 
-data: data/locations/2015-04-19
 
+pbf: $(LOCATION_PBFS:%=%/.mark)
 
-data/%.tgz:
+pbf/%/.mark: tgz/%.tgz
 	mkdir -p $(dir $@)
-	curl 'https://s3.amazonaws.com/capmetro-feed/$@' -o $@.download
+	tar -xvf $< --strip-components=3 -C $(dir $@)
+	touch $@
+
+
+tgz: $(LOCATION_TGZS)
+
+tgz/%.tgz:
+	mkdir -p $(dir $@)
+	curl 'https://s3.amazonaws.com/capmetro-feed/$(patsubst tgz/%,data/%,$@)' -o $@.download
 	mv $@.download $@
 
 
-data/locations/%: data/locations/%.tgz
-	mkdir -p $(dir $@)
-	tar -xvf $< -C $(dir $@)
+
+load-%: pbf/locations/%/.loaded
+	echo $<
 
 
-load:
-	babel-node ./loadPositions.es 'data/locations/2015-04-19/capmetro-realtime-2015-04-19-12:03:01.pbf'
+pbf/locations/%/.loaded: pbf/locations/%/.mark
+	$(foreach pbf_file,$(wildcard $(dir $<)*.pbf), babel-node ./loadPositions.es $(pbf_file);)
+	touch $@
