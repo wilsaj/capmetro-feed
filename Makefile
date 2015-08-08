@@ -20,6 +20,7 @@ pbf/%/.mark: tgz/%.tgz
 	touch $@
 
 
+
 tgz: $(LOCATION_TGZS)
 
 tgz/%.tgz:
@@ -30,9 +31,9 @@ tgz/%.tgz:
 
 
 load-%: pbf/locations/%/.loaded
-	echo $<
+	echo $@
 
 
 pbf/locations/%/.loaded: pbf/locations/%/.mark
-	$(foreach pbf_file,$(wildcard $(dir $<)*.pbf), babel-node ./loadPositions.es $(pbf_file);)
+	babel-node ./loadPositions.es $(wildcard $(dir $<)*.pbf)
 	touch $@

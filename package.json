@@ -11,6 +11,7 @@
   "dependencies": {
     "event-stream": "^3.3.0",
     "gtfs-realtime-bindings": "0.0.4",
+    "highland": "^2.5.1",
     "minimist": "^1.1.1",
     "rethinkdb": "^2.0.0"
   }
