@@ -3,7 +3,6 @@
 const es = require('event-stream');
 const fs = require('fs');
 const GTFS = require('gtfs-realtime-bindings');
-const highland = require('highland');
 const r = require('rethinkdb');
 
 const argv = require('minimist')(process.argv.slice(2));
@@ -54,7 +53,7 @@ function insertVehicle(conn, vehicle, cb) {
   });
 }
 
-function load(filepaths) {
+function load(filepath) {
   const dbName = db.connectionOpts.db;
 
   r.connect(db.connectionOpts, (err, conn) => {
@@ -69,15 +68,16 @@ function load(filepaths) {
       conn.use(dbName);
 
       r.tableCreate(db.tables.locations).run(conn, (err, data) => {
-        highland(filepaths).each((filepath) => {
-          return fs.createReadStream(filepath)
-            .pipe(entityStream())
-            .pipe(es.map((entity, cb) => {
-              if (entity.vehicle) {
-                insertVehicle(conn, entity.vehicle, cb);
-              }
-            }));
-        });
+        fs.createReadStream(filepath)
+          .pipe(entityStream())
+          .pipe(es.map((entity, cb) => {
+            if (entity.vehicle) {
+              insertVehicle(conn, entity.vehicle, cb);
+            }
+          }))
+          .on('end', () => {
+            process.exit();
+          });
       });
     });
   });
@@ -87,6 +87,6 @@ function load(filepaths) {
 
 
 if (require.main === module) {
-  var filepaths = argv['_'];
-  load(filepaths);
+  var filepath = argv['_'][0];
+  load(filepath);
 }
