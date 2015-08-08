@@ -35,5 +35,5 @@ load-%: pbf/locations/%/.loaded
 
 
 pbf/locations/%/.loaded: pbf/locations/%/.mark
-	babel-node ./loadPositions.es $(wildcard $(dir $<)*.pbf)
+	babel-node ./loadPositions.js $(wildcard $(dir $<)*.pbf)
 	touch $@
